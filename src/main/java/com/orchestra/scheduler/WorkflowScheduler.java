@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 
+import com.orchestra.execution.TaskExecutor;
 import com.orchestra.workflow.DagValidator;
 import com.orchestra.workflow.Task;
 import com.orchestra.workflow.TaskStatus;
@@ -15,9 +16,13 @@ import com.orchestra.workflow.Workflow;
 public class WorkflowScheduler {
 
     private final DagValidator dagValidator;
+    private final TaskExecutor taskExecutor;
 
-    public WorkflowScheduler(DagValidator dagValidator) {
+    public WorkflowScheduler(
+            DagValidator dagValidator,
+            TaskExecutor taskExecutor) {
         this.dagValidator = dagValidator;
+        this.taskExecutor = taskExecutor;
     }
 
     public void execute(Workflow workflow) {
@@ -26,14 +31,11 @@ public class WorkflowScheduler {
 
         Map<String, Task> tasks = workflow.getTasks();
 
-        Map<String, Integer> remainingDependencies =
-                buildDependencyCounts(tasks);
+        Map<String, Integer> remainingDependencies = buildDependencyCounts(tasks);
 
-        Map<String, List<String>> dependents =
-                buildDependentsMap(tasks);
+        Map<String, List<String>> dependents = buildDependentsMap(tasks);
 
-        Queue<String> readyQueue =
-                initializeReadyQueue(remainingDependencies);
+        Queue<String> readyQueue = initializeReadyQueue(remainingDependencies);
 
         while (!readyQueue.isEmpty()) {
 
@@ -41,17 +43,15 @@ public class WorkflowScheduler {
 
             Task task = tasks.get(taskId);
 
-            executeTask(task);
+            taskExecutor.execute(task);
 
             for (String dependentId : dependents.get(taskId)) {
 
-                int remaining =
-                        remainingDependencies.get(dependentId) - 1;
+                int remaining = remainingDependencies.get(dependentId) - 1;
 
                 remainingDependencies.put(
                         dependentId,
-                        remaining
-                );
+                        remaining);
 
                 if (remaining == 0) {
                     readyQueue.add(dependentId);
@@ -61,8 +61,7 @@ public class WorkflowScheduler {
     }
 
     private Map<String, Integer> buildDependencyCounts(
-            Map<String, Task> tasks
-    ) {
+            Map<String, Task> tasks) {
 
         Map<String, Integer> counts = new HashMap<>();
 
@@ -70,16 +69,14 @@ public class WorkflowScheduler {
 
             counts.put(
                     task.getId(),
-                    task.getDependencies().size()
-            );
+                    task.getDependencies().size());
         }
 
         return counts;
     }
 
     private Map<String, List<String>> buildDependentsMap(
-            Map<String, Task> tasks
-    ) {
+            Map<String, Task> tasks) {
 
         Map<String, List<String>> dependents = new HashMap<>();
 
@@ -101,13 +98,11 @@ public class WorkflowScheduler {
     }
 
     private Queue<String> initializeReadyQueue(
-            Map<String, Integer> remainingDependencies
-    ) {
+            Map<String, Integer> remainingDependencies) {
 
         Queue<String> readyQueue = new ArrayDeque<>();
 
-        for (Map.Entry<String, Integer> entry :
-                remainingDependencies.entrySet()) {
+        for (Map.Entry<String, Integer> entry : remainingDependencies.entrySet()) {
 
             if (entry.getValue() == 0) {
                 readyQueue.add(entry.getKey());
@@ -122,13 +117,11 @@ public class WorkflowScheduler {
         task.setStatus(TaskStatus.RUNNING);
 
         System.out.println(
-                "Executing task: " + task.getId()
-        );
+                "Executing task: " + task.getId());
 
         task.setStatus(TaskStatus.SUCCESS);
 
         System.out.println(
-                "Task completed: " + task.getId()
-        );
+                "Task completed: " + task.getId());
     }
 }

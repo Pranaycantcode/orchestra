@@ -259,4 +259,58 @@ class WorkflowSchedulerTest {
         assertTrue(
                 executor.getExecutionOrder().isEmpty());
     }
+
+    @Test
+    void shouldBlockDependentTaskWhenDependencyFails() {
+
+        Task taskA = new Task(
+                "A",
+                "Task A",
+                "echo A",
+                Set.of());
+
+        Task taskB = new Task(
+                "B",
+                "Task B",
+                "echo B",
+                Set.of("A"));
+
+        Task taskC = new Task(
+                "C",
+                "Task C",
+                "echo C",
+                Set.of("B"));
+
+        Workflow workflow = new Workflow(
+                "workflow-failure-1",
+                "Failure propagation",
+                Map.of(
+                        "A", taskA,
+                        "B", taskB,
+                        "C", taskC));
+
+        ControlledTaskExecutor executor = new ControlledTaskExecutor(Set.of("B"));
+
+        WorkflowScheduler scheduler = new WorkflowScheduler(
+                new DagValidator(),
+                executor);
+
+        scheduler.execute(workflow);
+
+        assertEquals(
+                TaskStatus.SUCCESS,
+                taskA.getStatus());
+
+        assertEquals(
+                TaskStatus.FAILED,
+                taskB.getStatus());
+
+        assertEquals(
+                TaskStatus.BLOCKED,
+                taskC.getStatus());
+
+        assertEquals(
+                List.of("A", "B"),
+                executor.getExecutionOrder());
+    }
 }

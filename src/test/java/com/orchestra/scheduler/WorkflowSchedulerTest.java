@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
@@ -312,5 +313,145 @@ class WorkflowSchedulerTest {
         assertEquals(
                 List.of("A", "B"),
                 executor.getExecutionOrder());
+    }
+
+    @Test
+    void shouldBlockAllDownstreamTasksWhenDependencyFails() {
+
+        Task taskA = new Task(
+                "A",
+                "Task A",
+                "echo A",
+                Set.of());
+
+        Task taskB = new Task(
+                "B",
+                "Task B",
+                "echo B",
+                Set.of("A"));
+
+        Task taskC = new Task(
+                "C",
+                "Task C",
+                "echo C",
+                Set.of("B"));
+
+        Task taskD = new Task(
+                "D",
+                "Task D",
+                "echo D",
+                Set.of("C"));
+
+        Workflow workflow = new Workflow(
+                "workflow-failure-2",
+                "Transitive failure propagation",
+                Map.of(
+                        "A", taskA,
+                        "B", taskB,
+                        "C", taskC,
+                        "D", taskD));
+
+        ControlledTaskExecutor executor = new ControlledTaskExecutor(Set.of("B"));
+
+        WorkflowScheduler scheduler = new WorkflowScheduler(
+                new DagValidator(),
+                executor);
+
+        scheduler.execute(workflow);
+
+        assertEquals(
+                TaskStatus.SUCCESS,
+                taskA.getStatus());
+
+        assertEquals(
+                TaskStatus.FAILED,
+                taskB.getStatus());
+
+        assertEquals(
+                TaskStatus.BLOCKED,
+                taskC.getStatus());
+
+        assertEquals(
+                TaskStatus.BLOCKED,
+                taskD.getStatus());
+
+        assertEquals(
+                List.of("A", "B"),
+                executor.getExecutionOrder());
+    }
+
+    @Test
+    void shouldBlockDownstreamTasksInBranchingDag() {
+
+        Task taskA = new Task(
+                "A",
+                "Task A",
+                "echo A",
+                Set.of());
+
+        Task taskB = new Task(
+                "B",
+                "Task B",
+                "echo B",
+                Set.of("A"));
+
+        Task taskC = new Task(
+                "C",
+                "Task C",
+                "echo C",
+                Set.of("A"));
+
+        Task taskD = new Task(
+                "D",
+                "Task D",
+                "echo D",
+                Set.of("B", "C"));
+
+        Task taskE = new Task(
+                "E",
+                "Task E",
+                "echo E",
+                Set.of("D"));
+
+        Workflow workflow = new Workflow(
+                "workflow-failure-3",
+                "Branching failure propagation",
+                Map.of(
+                        "A", taskA,
+                        "B", taskB,
+                        "C", taskC,
+                        "D", taskD,
+                        "E", taskE));
+
+        ControlledTaskExecutor executor = new ControlledTaskExecutor(Set.of("B"));
+
+        WorkflowScheduler scheduler = new WorkflowScheduler(
+                new DagValidator(),
+                executor);
+
+        scheduler.execute(workflow);
+
+        assertEquals(TaskStatus.SUCCESS, taskA.getStatus());
+        assertEquals(TaskStatus.FAILED, taskB.getStatus());
+        assertEquals(TaskStatus.SUCCESS, taskC.getStatus());
+        assertEquals(TaskStatus.BLOCKED, taskD.getStatus());
+        assertEquals(TaskStatus.BLOCKED, taskE.getStatus());
+
+        List<String> executionOrder = executor.getExecutionOrder();
+
+        assertEquals(3, executionOrder.size());
+
+        assertTrue(executionOrder.contains("A"));
+        assertTrue(executionOrder.contains("B"));
+        assertTrue(executionOrder.contains("C"));
+
+        assertTrue(
+                executionOrder.indexOf("A") < executionOrder.indexOf("B"));
+
+        assertTrue(
+                executionOrder.indexOf("A") < executionOrder.indexOf("C"));
+
+        assertFalse(executionOrder.contains("D"));
+        assertFalse(executionOrder.contains("E"));
     }
 }

@@ -101,10 +101,20 @@ public class WorkflowScheduler {
 
         for (String dependentId : dependents.get(taskId)) {
 
+            if (blockedTasks.contains(dependentId)) {
+                continue;
+            }
+
             blockedTasks.add(dependentId);
 
             tasks.get(dependentId)
                     .setStatus(TaskStatus.BLOCKED);
+
+            handleFailure(
+                    dependentId,
+                    dependents,
+                    tasks,
+                    blockedTasks);
         }
     }
 

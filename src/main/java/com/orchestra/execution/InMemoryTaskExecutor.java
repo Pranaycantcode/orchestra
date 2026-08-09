@@ -6,7 +6,7 @@ import com.orchestra.workflow.TaskStatus;
 public class InMemoryTaskExecutor implements TaskExecutor {
 
     @Override
-    public void execute(Task task) {
+    public TaskExecutionResult execute(Task task) {
 
         task.setStatus(TaskStatus.RUNNING);
 
@@ -19,5 +19,7 @@ public class InMemoryTaskExecutor implements TaskExecutor {
         System.out.println(
                 "Task completed: " + task.getId()
         );
+
+        return TaskExecutionResult.SUCCESS;
     }
 }

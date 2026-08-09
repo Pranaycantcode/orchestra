@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
+import com.orchestra.execution.TaskExecutionResult;
 import com.orchestra.execution.TaskExecutor;
 import com.orchestra.workflow.DagValidator;
 import com.orchestra.workflow.Task;
@@ -24,12 +25,48 @@ class WorkflowSchedulerTest {
         private final List<String> executionOrder = new ArrayList<>();
 
         @Override
-        public void execute(Task task) {
+        public TaskExecutionResult execute(Task task) {
 
             executionOrder.add(task.getId());
 
             task.setStatus(TaskStatus.RUNNING);
             task.setStatus(TaskStatus.SUCCESS);
+
+            return TaskExecutionResult.SUCCESS;
+        }
+
+        public List<String> getExecutionOrder() {
+            return executionOrder;
+        }
+    }
+
+    private static class ControlledTaskExecutor
+            implements TaskExecutor {
+
+        private final Set<String> tasksToFail;
+        private final List<String> executionOrder = new ArrayList<>();
+
+        ControlledTaskExecutor(Set<String> tasksToFail) {
+            this.tasksToFail = tasksToFail;
+        }
+
+        @Override
+        public TaskExecutionResult execute(Task task) {
+
+            executionOrder.add(task.getId());
+
+            task.setStatus(TaskStatus.RUNNING);
+
+            if (tasksToFail.contains(task.getId())) {
+
+                task.setStatus(TaskStatus.FAILED);
+
+                return TaskExecutionResult.FAILED;
+            }
+
+            task.setStatus(TaskStatus.SUCCESS);
+
+            return TaskExecutionResult.SUCCESS;
         }
 
         public List<String> getExecutionOrder() {
@@ -44,22 +81,19 @@ class WorkflowSchedulerTest {
                 "A",
                 "Task A",
                 "echo A",
-                Set.of()
-        );
+                Set.of());
 
         Task taskB = new Task(
                 "B",
                 "Task B",
                 "echo B",
-                Set.of("A")
-        );
+                Set.of("A"));
 
         Task taskC = new Task(
                 "C",
                 "Task C",
                 "echo C",
-                Set.of("B")
-        );
+                Set.of("B"));
 
         Workflow workflow = new Workflow(
                 "workflow-1",
@@ -67,25 +101,19 @@ class WorkflowSchedulerTest {
                 Map.of(
                         "A", taskA,
                         "B", taskB,
-                        "C", taskC
-                )
-        );
+                        "C", taskC));
 
-        RecordingTaskExecutor executor =
-                new RecordingTaskExecutor();
+        RecordingTaskExecutor executor = new RecordingTaskExecutor();
 
-        WorkflowScheduler scheduler =
-                new WorkflowScheduler(
-                        new DagValidator(),
-                        executor
-                );
+        WorkflowScheduler scheduler = new WorkflowScheduler(
+                new DagValidator(),
+                executor);
 
         scheduler.execute(workflow);
 
         assertEquals(
                 List.of("A", "B", "C"),
-                executor.getExecutionOrder()
-        );
+                executor.getExecutionOrder());
 
         assertEquals(TaskStatus.SUCCESS, taskA.getStatus());
         assertEquals(TaskStatus.SUCCESS, taskB.getStatus());
@@ -99,29 +127,25 @@ class WorkflowSchedulerTest {
                 "A",
                 "Task A",
                 "echo A",
-                Set.of()
-        );
+                Set.of());
 
         Task taskB = new Task(
                 "B",
                 "Task B",
                 "echo B",
-                Set.of("A")
-        );
+                Set.of("A"));
 
         Task taskC = new Task(
                 "C",
                 "Task C",
                 "echo C",
-                Set.of("A")
-        );
+                Set.of("A"));
 
         Task taskD = new Task(
                 "D",
                 "Task D",
                 "echo D",
-                Set.of("B", "C")
-        );
+                Set.of("B", "C"));
 
         Workflow workflow = new Workflow(
                 "workflow-2",
@@ -130,18 +154,13 @@ class WorkflowSchedulerTest {
                         "A", taskA,
                         "B", taskB,
                         "C", taskC,
-                        "D", taskD
-                )
-        );
+                        "D", taskD));
 
-        RecordingTaskExecutor executor =
-                new RecordingTaskExecutor();
+        RecordingTaskExecutor executor = new RecordingTaskExecutor();
 
-        WorkflowScheduler scheduler =
-                new WorkflowScheduler(
-                        new DagValidator(),
-                        executor
-                );
+        WorkflowScheduler scheduler = new WorkflowScheduler(
+                new DagValidator(),
+                executor);
 
         scheduler.execute(workflow);
 
@@ -166,22 +185,19 @@ class WorkflowSchedulerTest {
                 "A",
                 "Task A",
                 "echo A",
-                Set.of()
-        );
+                Set.of());
 
         Task taskB = new Task(
                 "B",
                 "Task B",
                 "echo B",
-                Set.of()
-        );
+                Set.of());
 
         Task taskC = new Task(
                 "C",
                 "Task C",
                 "echo C",
-                Set.of()
-        );
+                Set.of());
 
         Workflow workflow = new Workflow(
                 "workflow-3",
@@ -189,30 +205,23 @@ class WorkflowSchedulerTest {
                 Map.of(
                         "A", taskA,
                         "B", taskB,
-                        "C", taskC
-                )
-        );
+                        "C", taskC));
 
-        RecordingTaskExecutor executor =
-                new RecordingTaskExecutor();
+        RecordingTaskExecutor executor = new RecordingTaskExecutor();
 
-        WorkflowScheduler scheduler =
-                new WorkflowScheduler(
-                        new DagValidator(),
-                        executor
-                );
+        WorkflowScheduler scheduler = new WorkflowScheduler(
+                new DagValidator(),
+                executor);
 
         scheduler.execute(workflow);
 
         assertEquals(
                 3,
-                executor.getExecutionOrder().size()
-        );
+                executor.getExecutionOrder().size());
 
         assertTrue(
                 executor.getExecutionOrder()
-                        .containsAll(List.of("A", "B", "C"))
-        );
+                        .containsAll(List.of("A", "B", "C")));
     }
 
     @Test
@@ -222,41 +231,32 @@ class WorkflowSchedulerTest {
                 "A",
                 "Task A",
                 "echo A",
-                Set.of("B")
-        );
+                Set.of("B"));
 
         Task taskB = new Task(
                 "B",
                 "Task B",
                 "echo B",
-                Set.of("A")
-        );
+                Set.of("A"));
 
         Workflow workflow = new Workflow(
                 "workflow-4",
                 "Cyclic workflow",
                 Map.of(
                         "A", taskA,
-                        "B", taskB
-                )
-        );
+                        "B", taskB));
 
-        RecordingTaskExecutor executor =
-                new RecordingTaskExecutor();
+        RecordingTaskExecutor executor = new RecordingTaskExecutor();
 
-        WorkflowScheduler scheduler =
-                new WorkflowScheduler(
-                        new DagValidator(),
-                        executor
-                );
+        WorkflowScheduler scheduler = new WorkflowScheduler(
+                new DagValidator(),
+                executor);
 
         assertThrows(
                 WorkflowValidationException.class,
-                () -> scheduler.execute(workflow)
-        );
+                () -> scheduler.execute(workflow));
 
         assertTrue(
-                executor.getExecutionOrder().isEmpty()
-        );
+                executor.getExecutionOrder().isEmpty());
     }
 }

@@ -3,10 +3,13 @@ package com.orchestra.scheduler;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 
+import com.orchestra.execution.TaskExecutionResult;
 import com.orchestra.execution.TaskExecutor;
 import com.orchestra.workflow.DagValidator;
 import com.orchestra.workflow.Task;
@@ -37,26 +40,71 @@ public class WorkflowScheduler {
 
         Queue<String> readyQueue = initializeReadyQueue(remainingDependencies);
 
+        Set<String> blockedTasks = new HashSet<>();
+
         while (!readyQueue.isEmpty()) {
 
             String taskId = readyQueue.poll();
 
             Task task = tasks.get(taskId);
 
-            taskExecutor.execute(task);
+            TaskExecutionResult result = taskExecutor.execute(task);
 
-            for (String dependentId : dependents.get(taskId)) {
+            if (result == TaskExecutionResult.SUCCESS) {
 
-                int remaining = remainingDependencies.get(dependentId) - 1;
+                handleSuccess(
+                        taskId,
+                        dependents,
+                        remainingDependencies,
+                        blockedTasks,
+                        readyQueue);
 
-                remainingDependencies.put(
-                        dependentId,
-                        remaining);
+            } else {
 
-                if (remaining == 0) {
-                    readyQueue.add(dependentId);
-                }
+                handleFailure(
+                        taskId,
+                        dependents,
+                        tasks,
+                        blockedTasks);
             }
+        }
+    }
+
+    private void handleSuccess(
+            String taskId,
+            Map<String, List<String>> dependents,
+            Map<String, Integer> remainingDependencies,
+            Set<String> blockedTasks,
+            Queue<String> readyQueue) {
+
+        for (String dependentId : dependents.get(taskId)) {
+
+            int remaining = remainingDependencies.get(dependentId) - 1;
+
+            remainingDependencies.put(
+                    dependentId,
+                    remaining);
+
+            if (remaining == 0 &&
+                    !blockedTasks.contains(dependentId)) {
+
+                readyQueue.add(dependentId);
+            }
+        }
+    }
+
+    private void handleFailure(
+            String taskId,
+            Map<String, List<String>> dependents,
+            Map<String, Task> tasks,
+            Set<String> blockedTasks) {
+
+        for (String dependentId : dependents.get(taskId)) {
+
+            blockedTasks.add(dependentId);
+
+            tasks.get(dependentId)
+                    .setStatus(TaskStatus.BLOCKED);
         }
     }
 

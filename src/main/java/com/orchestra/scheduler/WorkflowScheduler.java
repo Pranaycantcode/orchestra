@@ -8,7 +8,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
+import com.orchestra.execution.TaskExecution;
+import com.orchestra.execution.TaskExecutionPool;
 import com.orchestra.execution.TaskExecutionResult;
 import com.orchestra.execution.TaskExecutor;
 import com.orchestra.workflow.DagValidator;
@@ -20,12 +24,15 @@ public class WorkflowScheduler {
 
     private final DagValidator dagValidator;
     private final TaskExecutor taskExecutor;
+    private final TaskExecutionPool executionPool;
 
     public WorkflowScheduler(
             DagValidator dagValidator,
-            TaskExecutor taskExecutor) {
+            TaskExecutor taskExecutor,
+            TaskExecutionPool executionPool) {
         this.dagValidator = dagValidator;
         this.taskExecutor = taskExecutor;
+        this.executionPool = executionPool;
     }
 
     public void execute(Workflow workflow) {
@@ -38,35 +45,93 @@ public class WorkflowScheduler {
 
         Map<String, List<String>> dependents = buildDependentsMap(tasks);
 
-        Queue<String> readyQueue = initializeReadyQueue(remainingDependencies);
+        Queue<String> readyQueue = initializeReadyQueue(
+                remainingDependencies);
 
         Set<String> blockedTasks = new HashSet<>();
 
-        while (!readyQueue.isEmpty()) {
+        int runningTasks = 0;
 
-            String taskId = readyQueue.poll();
+        while (!readyQueue.isEmpty()
+                || runningTasks > 0) {
 
-            Task task = tasks.get(taskId);
+            while (!readyQueue.isEmpty()) {
 
-            TaskExecutionResult result = taskExecutor.execute(task);
+                String taskId = readyQueue.poll();
 
-            if (result == TaskExecutionResult.SUCCESS) {
+                Task task = tasks.get(taskId);
 
-                handleSuccess(
-                        taskId,
-                        dependents,
-                        remainingDependencies,
-                        blockedTasks,
-                        readyQueue);
+                executionPool.submit(
+                        task,
+                        taskExecutor);
 
-            } else {
-
-                handleFailure(
-                        taskId,
-                        dependents,
-                        tasks,
-                        blockedTasks);
+                runningTasks++;
             }
+
+            if (runningTasks > 0) {
+
+                try {
+
+                    Future<TaskExecution> completed = executionPool.takeCompleted();
+
+                    TaskExecution execution = completed.get();
+
+                    runningTasks--;
+
+                    handleTaskCompletion(
+                            execution,
+                            tasks,
+                            dependents,
+                            remainingDependencies,
+                            blockedTasks,
+                            readyQueue);
+
+                } catch (InterruptedException e) {
+
+                    Thread.currentThread().interrupt();
+
+                    throw new RuntimeException(
+                            "Scheduler interrupted",
+                            e);
+
+                } catch (ExecutionException e) {
+
+                    throw new RuntimeException(
+                            "Task execution failed unexpectedly",
+                            e);
+                }
+            }
+        }
+    }
+
+    private void handleTaskCompletion(
+            TaskExecution execution,
+            Map<String, Task> tasks,
+            Map<String, List<String>> dependents,
+            Map<String, Integer> remainingDependencies,
+            Set<String> blockedTasks,
+            Queue<String> readyQueue) {
+
+        String taskId = execution.taskId();
+
+        TaskExecutionResult result = execution.result();
+
+        if (result == TaskExecutionResult.SUCCESS) {
+
+            handleSuccess(
+                    taskId,
+                    dependents,
+                    remainingDependencies,
+                    blockedTasks,
+                    readyQueue);
+
+        } else {
+
+            handleFailure(
+                    taskId,
+                    dependents,
+                    tasks,
+                    blockedTasks);
         }
     }
 
@@ -85,8 +150,8 @@ public class WorkflowScheduler {
                     dependentId,
                     remaining);
 
-            if (remaining == 0 &&
-                    !blockedTasks.contains(dependentId)) {
+            if (remaining == 0
+                    && !blockedTasks.contains(dependentId)) {
 
                 readyQueue.add(dependentId);
             }

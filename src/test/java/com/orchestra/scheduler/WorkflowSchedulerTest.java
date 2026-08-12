@@ -1,9 +1,14 @@
 package com.orchestra.scheduler;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -73,6 +78,82 @@ class WorkflowSchedulerTest {
 
                 public List<String> getExecutionOrder() {
                         return executionOrder;
+                }
+        }
+
+        private static class ConcurrentRecordingExecutor
+                        implements TaskExecutor {
+
+                private final List<String> executionOrder = Collections.synchronizedList(
+                                new ArrayList<>());
+
+                @Override
+                public TaskExecutionResult execute(Task task) {
+
+                        executionOrder.add(task.getId());
+
+                        task.setStatus(TaskStatus.RUNNING);
+                        task.setStatus(TaskStatus.SUCCESS);
+
+                        return TaskExecutionResult.SUCCESS;
+                }
+
+                public List<String> getExecutionOrder() {
+                        return executionOrder;
+                }
+        }
+
+        private static class BlockingExecutor
+                        implements TaskExecutor {
+
+                private final CountDownLatch started = new CountDownLatch(2);
+
+                private final CountDownLatch release = new CountDownLatch(1);
+
+                private final List<String> executedTasks = Collections.synchronizedList(
+                                new ArrayList<>());
+
+                @Override
+                public TaskExecutionResult execute(Task task) {
+
+                        task.setStatus(TaskStatus.RUNNING);
+
+                        if (task.getId().equals("B")
+                                        || task.getId().equals("C")) {
+
+                                executedTasks.add(task.getId());
+
+                                started.countDown();
+
+                                try {
+                                        release.await();
+                                } catch (InterruptedException e) {
+
+                                        Thread.currentThread().interrupt();
+
+                                        task.setStatus(TaskStatus.FAILED);
+
+                                        return TaskExecutionResult.FAILED;
+                                }
+                        }
+
+                        task.setStatus(TaskStatus.SUCCESS);
+
+                        return TaskExecutionResult.SUCCESS;
+                }
+
+                public void awaitBothStarted()
+                                throws InterruptedException {
+
+                        started.await();
+                }
+
+                public void releaseTasks() {
+                        release.countDown();
+                }
+
+                public List<String> getExecutedTasks() {
+                        return executedTasks;
                 }
         }
 
@@ -238,7 +319,7 @@ class WorkflowSchedulerTest {
                                 executor.getExecutionOrder()
                                                 .containsAll(List.of("A", "B", "C")));
 
-                pool.shutdown();                                
+                pool.shutdown();
         }
 
         @Test
@@ -278,7 +359,7 @@ class WorkflowSchedulerTest {
 
                 assertTrue(
                                 executor.getExecutionOrder().isEmpty());
-                pool.shutdown();                
+                pool.shutdown();
         }
 
         @Test
@@ -337,7 +418,7 @@ class WorkflowSchedulerTest {
                                 List.of("A", "B"),
                                 executor.getExecutionOrder());
 
-                pool.shutdown();                
+                pool.shutdown();
         }
 
         @Test
@@ -407,7 +488,7 @@ class WorkflowSchedulerTest {
                                 List.of("A", "B"),
                                 executor.getExecutionOrder());
 
-                pool.shutdown();                
+                pool.shutdown();
         }
 
         @Test
@@ -491,7 +572,7 @@ class WorkflowSchedulerTest {
         }
 
         @Test
-        void shouldExecuteIndependentTasksConcurrently()
+        void shouldExecuteIndependentTasksConcurrentlylite()
                         throws Exception {
 
                 Task taskA = new Task(
@@ -552,4 +633,185 @@ class WorkflowSchedulerTest {
 
                 pool.shutdown();
         }
+
+        @Test
+        void shouldRespectDependenciesWhileExecutingIndependentTasks()
+                        throws Exception {
+
+                Task taskA = new Task(
+                                "A",
+                                "Task A",
+                                "echo A",
+                                Set.of());
+
+                Task taskB = new Task(
+                                "B",
+                                "Task B",
+                                "echo B",
+                                Set.of("A"));
+
+                Task taskC = new Task(
+                                "C",
+                                "Task C",
+                                "echo C",
+                                Set.of("A"));
+
+                Task taskD = new Task(
+                                "D",
+                                "Task D",
+                                "echo D",
+                                Set.of("B", "C"));
+
+                Workflow workflow = new Workflow(
+                                "concurrent-dag",
+                                "Concurrent DAG test",
+                                Map.of(
+                                                "A", taskA,
+                                                "B", taskB,
+                                                "C", taskC,
+                                                "D", taskD));
+
+                ConcurrentRecordingExecutor executor = new ConcurrentRecordingExecutor();
+
+                TaskExecutionPool pool = new TaskExecutionPool(2);
+
+                WorkflowScheduler scheduler = new WorkflowScheduler(
+                                new DagValidator(),
+                                executor,
+                                pool);
+
+                scheduler.execute(workflow);
+
+                List<String> order = executor.getExecutionOrder();
+
+                assertEquals(4, order.size());
+
+                assertTrue(order.contains("A"));
+                assertTrue(order.contains("B"));
+                assertTrue(order.contains("C"));
+                assertTrue(order.contains("D"));
+
+                assertTrue(
+                                order.indexOf("A") < order.indexOf("B"));
+
+                assertTrue(
+                                order.indexOf("A") < order.indexOf("C"));
+
+                assertTrue(
+                                order.indexOf("B") < order.indexOf("D"));
+
+                assertTrue(
+                                order.indexOf("C") < order.indexOf("D"));
+
+                assertEquals(
+                                TaskStatus.SUCCESS,
+                                taskA.getStatus());
+
+                assertEquals(
+                                TaskStatus.SUCCESS,
+                                taskB.getStatus());
+
+                assertEquals(
+                                TaskStatus.SUCCESS,
+                                taskC.getStatus());
+
+                assertEquals(
+                                TaskStatus.SUCCESS,
+                                taskD.getStatus());
+
+                pool.shutdown();
+
+        }
+
+        @Test
+        void shouldExecuteIndependentTasksConcurrently()
+                        throws Exception {
+
+                Task taskA = new Task(
+                                "A",
+                                "Task A",
+                                "echo A",
+                                Set.of());
+
+                Task taskB = new Task(
+                                "B",
+                                "Task B",
+                                "echo B",
+                                Set.of("A"));
+
+                Task taskC = new Task(
+                                "C",
+                                "Task C",
+                                "echo C",
+                                Set.of("A"));
+
+                Task taskD = new Task(
+                                "D",
+                                "Task D",
+                                "echo D",
+                                Set.of("B", "C"));
+
+                Workflow workflow = new Workflow(
+                                "concurrent-dag",
+                                "Concurrent DAG test",
+                                Map.of(
+                                                "A", taskA,
+                                                "B", taskB,
+                                                "C", taskC,
+                                                "D", taskD));
+
+                BlockingExecutor executor = new BlockingExecutor();
+
+                TaskExecutionPool pool = new TaskExecutionPool(2);
+
+                WorkflowScheduler scheduler = new WorkflowScheduler(
+                                new DagValidator(),
+                                executor,
+                                pool);
+
+                ExecutorService schedulerThread = Executors.newSingleThreadExecutor();
+
+                try {
+
+                        Future<?> schedulerFuture = schedulerThread.submit(
+                                        () -> scheduler.execute(workflow));
+
+                        executor.awaitBothStarted();
+
+                        assertEquals(
+                                        Set.of("B", "C"),
+                                        Set.copyOf(
+                                                        executor.getExecutedTasks()));
+
+                        
+                        executor.releaseTasks();
+
+                        schedulerFuture.get();
+
+                        assertEquals(
+                                        TaskStatus.SUCCESS,
+                                        taskA.getStatus());
+
+                        assertEquals(
+                                        TaskStatus.SUCCESS,
+                                        taskB.getStatus());
+
+                        assertEquals(
+                                        TaskStatus.SUCCESS,
+                                        taskC.getStatus());
+
+                        assertEquals(
+                                        TaskStatus.SUCCESS,
+                                        taskD.getStatus());
+
+                } finally {
+
+                        
+                        executor.releaseTasks();
+
+                        pool.shutdown();
+                        schedulerThread.shutdown();
+                }
+        }
+
 }

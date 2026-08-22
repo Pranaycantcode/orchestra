@@ -17,6 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
+import com.orchestra.execution.RetryScheduler;
+import com.orchestra.workflow.RetryPolicy;
 import com.orchestra.execution.TaskExecutionPool;
 import com.orchestra.execution.TaskExecutionResult;
 import com.orchestra.execution.TaskExecutor;
@@ -942,6 +944,90 @@ class WorkflowSchedulerTest {
                 } finally {
 
                         pool.shutdown();
+                }
+        }
+
+        @Test
+        void shouldRetryTaskAfterBackoff()
+                        throws Exception {
+
+                Task task = new Task(
+                                "A",
+                                "Task A",
+                                "retryable task",
+                                Set.of());
+
+                task.setMaxRetries(1);
+
+                Workflow workflow = new Workflow(
+                                "backoff-workflow",
+                                "Backoff workflow",
+                                Map.of(
+                                                "A", task));
+
+                AtomicInteger attempts = new AtomicInteger(0);
+
+                TaskExecutor executor = currentTask -> {
+
+                        int attempt = attempts.incrementAndGet();
+
+                        currentTask.setStatus(
+                                        TaskStatus.RUNNING);
+
+                        if (attempt == 1) {
+
+                                currentTask.setStatus(
+                                                TaskStatus.FAILED);
+
+                                return TaskExecutionResult.FAILED;
+                        }
+
+                        currentTask.setStatus(
+                                        TaskStatus.SUCCESS);
+
+                        return TaskExecutionResult.SUCCESS;
+                };
+
+                TaskExecutionPool pool = new TaskExecutionPool(1);
+
+                RetryPolicy retryPolicy = new RetryPolicy(100);
+
+                var scheduledExecutor = Executors.newScheduledThreadPool(1);
+
+                RetryScheduler retryScheduler = new RetryScheduler(
+                                scheduledExecutor);
+
+                WorkflowScheduler scheduler = new WorkflowScheduler(
+                                new DagValidator(),
+                                executor,
+                                pool,
+                                retryPolicy,
+                                retryScheduler);
+
+                try {
+
+                        long start = System.currentTimeMillis();
+
+                        scheduler.execute(workflow);
+
+                        long elapsed = System.currentTimeMillis()
+                                        - start;
+
+                        assertEquals(
+                                        2,
+                                        attempts.get());
+
+                        assertEquals(
+                                        TaskStatus.SUCCESS,
+                                        task.getStatus());
+
+                        assertTrue(
+                                        elapsed >= 100);
+
+                } finally {
+
+                        pool.shutdown();
+                        retryScheduler.shutdown();
                 }
         }
 

@@ -9,13 +9,17 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import com.orchestra.execution.RetryScheduler;
 import com.orchestra.execution.TaskExecution;
 import com.orchestra.execution.TaskExecutionPool;
 import com.orchestra.execution.TaskExecutionResult;
 import com.orchestra.execution.TaskExecutor;
 import com.orchestra.workflow.DagValidator;
+import com.orchestra.workflow.RetryPolicy;
 import com.orchestra.workflow.Task;
 import com.orchestra.workflow.TaskStatus;
 import com.orchestra.workflow.Workflow;
@@ -25,14 +29,36 @@ public class WorkflowScheduler {
     private final DagValidator dagValidator;
     private final TaskExecutor taskExecutor;
     private final TaskExecutionPool executionPool;
+    private final RetryPolicy retryPolicy;
+    private final RetryScheduler retryScheduler;
+    private final AtomicInteger pendingRetries = new AtomicInteger(0);
+    private final Object retryMonitor = new Object();
 
     public WorkflowScheduler(
             DagValidator dagValidator,
             TaskExecutor taskExecutor,
             TaskExecutionPool executionPool) {
+
+        this(
+                dagValidator,
+                taskExecutor,
+                executionPool,
+                new RetryPolicy(100),
+                new RetryScheduler(
+                        Executors.newScheduledThreadPool(1)));
+    }
+
+    public WorkflowScheduler(
+            DagValidator dagValidator,
+            TaskExecutor taskExecutor,
+            TaskExecutionPool executionPool,
+            RetryPolicy retryPolicy,
+            RetryScheduler retryScheduler) {
         this.dagValidator = dagValidator;
         this.taskExecutor = taskExecutor;
         this.executionPool = executionPool;
+        this.retryPolicy = retryPolicy;
+        this.retryScheduler = retryScheduler;
     }
 
     public void execute(Workflow workflow) {
@@ -53,7 +79,8 @@ public class WorkflowScheduler {
         int runningTasks = 0;
 
         while (!readyQueue.isEmpty()
-                || runningTasks > 0) {
+                || runningTasks > 0
+                || pendingRetries.get() > 0) {
 
             while (!readyQueue.isEmpty()) {
 
@@ -100,6 +127,28 @@ public class WorkflowScheduler {
                             "Task execution failed unexpectedly",
                             e);
                 }
+
+            } else if (pendingRetries.get() > 0) {
+
+                synchronized (retryMonitor) {
+
+                    if (pendingRetries.get() > 0
+                            && readyQueue.isEmpty()) {
+
+                        try {
+
+                            retryMonitor.wait();
+
+                        } catch (InterruptedException e) {
+
+                            Thread.currentThread().interrupt();
+
+                            throw new RuntimeException(
+                                    "Scheduler interrupted",
+                                    e);
+                        }
+                    }
+                }
             }
         }
     }
@@ -137,7 +186,24 @@ public class WorkflowScheduler {
                 task.setStatus(
                         TaskStatus.PENDING);
 
-                readyQueue.add(taskId);
+                pendingRetries.incrementAndGet();
+
+                long delay = retryPolicy.getDelayMillis(
+                        task.getRetryCount());
+
+                retryScheduler.schedule(
+                        () -> {
+
+                            readyQueue.add(taskId);
+
+                            pendingRetries.decrementAndGet();
+
+                            synchronized (retryMonitor) {
+                                retryMonitor.notify();
+                            }
+
+                        },
+                        delay);
 
             } else {
 

@@ -11,12 +11,14 @@ public class Task {
 
     private TaskStatus status;
 
+    private int maxRetries = 0;
+    private int retryCount = 0;
+
     public Task(
             String id,
             String name,
             String command,
-            Set<String> dependencies
-    ) {
+            Set<String> dependencies) {
         this.id = id;
         this.name = name;
         this.command = command;
@@ -44,7 +46,27 @@ public class Task {
         return status;
     }
 
+    public int getMaxRetries() {
+        return maxRetries;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
     public void setStatus(TaskStatus status) {
         this.status = status;
+    }
+
+    public void setMaxRetries(int maxRetries) {
+        this.maxRetries = maxRetries;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    public boolean canRetry() {
+        return retryCount < maxRetries;
     }
 }

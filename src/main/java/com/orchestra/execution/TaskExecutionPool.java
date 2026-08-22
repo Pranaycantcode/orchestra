@@ -27,9 +27,23 @@ public class TaskExecutionPool {
             TaskExecutor taskExecutor) {
 
         completionService.submit(
-                () -> new TaskExecution(
-                        task.getId(),
-                        taskExecutor.execute(task)));
+                () -> {
+
+                    try {
+
+                        TaskExecutionResult result = taskExecutor.execute(task);
+
+                        return new TaskExecution(
+                                task.getId(),
+                                result);
+
+                    } catch (Exception e) {
+
+                        return new TaskExecution(
+                                task.getId(),
+                                TaskExecutionResult.FAILED);
+                    }
+                });
     }
 
     public Future<TaskExecution> takeCompleted()

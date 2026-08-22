@@ -11,89 +11,114 @@ import com.orchestra.workflow.TaskStatus;
 
 class TaskExecutionPoolTest {
 
-    @Test
-    void shouldExecuteTasksUsingMultipleThreads()
-            throws Exception {
+        @Test
+        void shouldExecuteTasksUsingMultipleThreads()
+                        throws Exception {
 
-        Task taskA = new Task(
-                "A",
-                "Task A",
-                "sleep",
-                Set.of()
-        );
+                Task taskA = new Task(
+                                "A",
+                                "Task A",
+                                "sleep",
+                                Set.of());
 
-        Task taskB = new Task(
-                "B",
-                "Task B",
-                "sleep",
-                Set.of()
-        );
+                Task taskB = new Task(
+                                "B",
+                                "Task B",
+                                "sleep",
+                                Set.of());
 
-        TaskExecutor executor = task -> {
+                TaskExecutor executor = task -> {
 
-            task.setStatus(TaskStatus.RUNNING);
+                        task.setStatus(TaskStatus.RUNNING);
 
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                        try {
+                                Thread.sleep(500);
+                        } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
 
-                task.setStatus(TaskStatus.FAILED);
+                                task.setStatus(TaskStatus.FAILED);
 
-                return TaskExecutionResult.FAILED;
-            }
+                                return TaskExecutionResult.FAILED;
+                        }
 
-            task.setStatus(TaskStatus.SUCCESS);
+                        task.setStatus(TaskStatus.SUCCESS);
 
-            return TaskExecutionResult.SUCCESS;
-        };
+                        return TaskExecutionResult.SUCCESS;
+                };
 
-        TaskExecutionPool pool =
-                new TaskExecutionPool(2);
+                TaskExecutionPool pool = new TaskExecutionPool(2);
 
-        pool.submit(taskA, executor);
-        pool.submit(taskB, executor);
+                pool.submit(taskA, executor);
+                pool.submit(taskB, executor);
 
-        Future<TaskExecution> first =
-                pool.takeCompleted();
+                Future<TaskExecution> first = pool.takeCompleted();
 
-        Future<TaskExecution> second =
-                pool.takeCompleted();
+                Future<TaskExecution> second = pool.takeCompleted();
 
-        TaskExecution firstExecution =
-                first.get();
+                TaskExecution firstExecution = first.get();
 
-        TaskExecution secondExecution =
-                second.get();
+                TaskExecution secondExecution = second.get();
 
-        assertEquals(
-                TaskExecutionResult.SUCCESS,
-                firstExecution.result()
-        );
+                assertEquals(
+                                TaskExecutionResult.SUCCESS,
+                                firstExecution.result());
 
-        assertEquals(
-                TaskExecutionResult.SUCCESS,
-                secondExecution.result()
-        );
+                assertEquals(
+                                TaskExecutionResult.SUCCESS,
+                                secondExecution.result());
 
-        assertEquals(
-                Set.of("A", "B"),
-                Set.of(
-                        firstExecution.taskId(),
-                        secondExecution.taskId()
-                )
-        );
+                assertEquals(
+                                Set.of("A", "B"),
+                                Set.of(
+                                                firstExecution.taskId(),
+                                                secondExecution.taskId()));
 
-        assertEquals(
-                TaskStatus.SUCCESS,
-                taskA.getStatus()
-        );
+                assertEquals(
+                                TaskStatus.SUCCESS,
+                                taskA.getStatus());
 
-        assertEquals(
-                TaskStatus.SUCCESS,
-                taskB.getStatus()
-        );
+                assertEquals(
+                                TaskStatus.SUCCESS,
+                                taskB.getStatus());
 
-        pool.shutdown();
-    }
+                pool.shutdown();
+        }
+
+        @Test
+        void shouldConvertTaskExceptionIntoFailure()
+                        throws Exception {
+
+                Task task = new Task(
+                                "A",
+                                "Task A",
+                                "explode",
+                                Set.of());
+
+                TaskExecutor executor = ignored -> {
+                        throw new RuntimeException("Something went wrong");
+                };
+
+                TaskExecutionPool pool = new TaskExecutionPool(1);
+
+                try {
+
+                        pool.submit(task, executor);
+
+                        Future<TaskExecution> future = pool.takeCompleted();
+
+                        TaskExecution execution = future.get();
+
+                        assertEquals(
+                                        "A",
+                                        execution.taskId());
+
+                        assertEquals(
+                                        TaskExecutionResult.FAILED,
+                                        execution.result());
+
+                } finally {
+
+                        pool.shutdown();
+                }
+        }
 }

@@ -9,6 +9,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -302,7 +303,7 @@ class WorkflowSchedulerTest {
 
                 RecordingTaskExecutor executor = new RecordingTaskExecutor();
 
-                TaskExecutionPool pool = new TaskExecutionPool(2);
+                TaskExecutionPool pool = new TaskExecutionPool(3);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -783,7 +784,6 @@ class WorkflowSchedulerTest {
                                         Set.copyOf(
                                                         executor.getExecutedTasks()));
 
-                        
                         executor.releaseTasks();
 
                         schedulerFuture.get();
@@ -806,11 +806,142 @@ class WorkflowSchedulerTest {
 
                 } finally {
 
-                        
                         executor.releaseTasks();
 
                         pool.shutdown();
                         schedulerThread.shutdown();
+                }
+        }
+
+        @Test
+        void shouldRetryFailedTaskAndEventuallySucceed()
+                        throws Exception {
+
+                Task task = new Task(
+                                "A",
+                                "Task A",
+                                "retryable task",
+                                Set.of());
+
+                task.setMaxRetries(1);
+
+                Workflow workflow = new Workflow(
+                                "retry-workflow",
+                                "Retry workflow",
+                                Map.of(
+                                                "A", task));
+
+                AtomicInteger attempts = new AtomicInteger(0);
+
+                TaskExecutor executor = currentTask -> {
+
+                        int attempt = attempts.incrementAndGet();
+
+                        currentTask.setStatus(
+                                        TaskStatus.RUNNING);
+
+                        if (attempt == 1) {
+
+                                currentTask.setStatus(
+                                                TaskStatus.FAILED);
+
+                                return TaskExecutionResult.FAILED;
+                        }
+
+                        currentTask.setStatus(
+                                        TaskStatus.SUCCESS);
+
+                        return TaskExecutionResult.SUCCESS;
+                };
+
+                TaskExecutionPool pool = new TaskExecutionPool(1);
+
+                WorkflowScheduler scheduler = new WorkflowScheduler(
+                                new DagValidator(),
+                                executor,
+                                pool);
+
+                try {
+
+                        scheduler.execute(workflow);
+
+                        assertEquals(
+                                        2,
+                                        attempts.get());
+
+                        assertEquals(
+                                        1,
+                                        task.getRetryCount());
+
+                        assertEquals(
+                                        TaskStatus.SUCCESS,
+                                        task.getStatus());
+
+                } finally {
+
+                        pool.shutdown();
+                }
+        }
+
+        @Test
+        void shouldFailWhenRetriesAreExhausted()
+                        throws Exception {
+
+                Task task = new Task(
+                                "A",
+                                "Task A",
+                                "always failing task",
+                                Set.of());
+
+                task.setMaxRetries(2);
+
+                Workflow workflow = new Workflow(
+                                "retry-exhausted-workflow",
+                                "Retry exhausted workflow",
+                                Map.of(
+                                                "A", task));
+
+                AtomicInteger attempts = new AtomicInteger(0);
+
+                TaskExecutor executor = currentTask -> {
+
+                        attempts.incrementAndGet();
+
+                        currentTask.setStatus(
+                                        TaskStatus.RUNNING);
+
+                        currentTask.setStatus(
+                                        TaskStatus.FAILED);
+
+                        return TaskExecutionResult.FAILED;
+                };
+
+                TaskExecutionPool pool = new TaskExecutionPool(1);
+
+                WorkflowScheduler scheduler = new WorkflowScheduler(
+                                new DagValidator(),
+                                executor,
+                                pool);
+
+                try {
+
+                        scheduler.execute(workflow);
+
+                        assertEquals(
+                                        3,
+                                        attempts.get());
+
+                        assertEquals(
+                                        2,
+                                        task.getRetryCount());
+
+                        assertEquals(
+                                        TaskStatus.FAILED,
+                                        task.getStatus());
+
+                } finally {
+
+                        pool.shutdown();
                 }
         }
 

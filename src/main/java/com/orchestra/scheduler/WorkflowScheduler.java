@@ -127,11 +127,26 @@ public class WorkflowScheduler {
 
         } else {
 
-            handleFailure(
-                    taskId,
-                    dependents,
-                    tasks,
-                    blockedTasks);
+            Task task = tasks.get(taskId);
+
+            if (task.canRetry()) {
+
+                task.setRetryCount(
+                        task.getRetryCount() + 1);
+
+                task.setStatus(
+                        TaskStatus.PENDING);
+
+                readyQueue.add(taskId);
+
+            } else {
+
+                handleFailure(
+                        taskId,
+                        dependents,
+                        tasks,
+                        blockedTasks);
+            }
         }
     }
 

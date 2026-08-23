@@ -18,11 +18,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import com.orchestra.execution.RetryScheduler;
-import com.orchestra.workflow.RetryPolicy;
 import com.orchestra.execution.TaskExecutionPool;
 import com.orchestra.execution.TaskExecutionResult;
 import com.orchestra.execution.TaskExecutor;
 import com.orchestra.workflow.DagValidator;
+import com.orchestra.workflow.RetryPolicy;
 import com.orchestra.workflow.Task;
 import com.orchestra.workflow.TaskStatus;
 import com.orchestra.workflow.Workflow;

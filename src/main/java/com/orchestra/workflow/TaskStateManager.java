@@ -26,8 +26,7 @@ public class TaskStateManager {
             Task task,
             TaskStatus targetStatus) {
 
-        TaskStatus currentStatus =
-                task.getStatus();
+        TaskStatus currentStatus = task.getStatus();
 
         if (!isValidTransition(
                 currentStatus,
@@ -37,8 +36,7 @@ public class TaskStateManager {
                     "Invalid task state transition: "
                             + currentStatus
                             + " -> "
-                            + targetStatus
-            );
+                            + targetStatus);
         }
 
         task.setStatus(targetStatus);
@@ -51,18 +49,19 @@ public class TaskStateManager {
         return switch (current) {
 
             case PENDING ->
-                    target == TaskStatus.RUNNING;
+                target == TaskStatus.RUNNING
+                        || target == TaskStatus.BLOCKED;
 
             case RUNNING ->
-                    target == TaskStatus.SUCCESS
-                            || target == TaskStatus.FAILED
-                            || target == TaskStatus.BLOCKED;
+                target == TaskStatus.SUCCESS
+                        || target == TaskStatus.FAILED
+                        || target == TaskStatus.BLOCKED;
 
             case FAILED ->
-                    target == TaskStatus.PENDING;
+                target == TaskStatus.PENDING;
 
             case SUCCESS, BLOCKED ->
-                    false;
+                false;
         };
     }
 }

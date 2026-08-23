@@ -21,7 +21,7 @@ import com.orchestra.execution.TaskExecutor;
 import com.orchestra.workflow.DagValidator;
 import com.orchestra.workflow.RetryPolicy;
 import com.orchestra.workflow.Task;
-import com.orchestra.workflow.TaskStatus;
+import com.orchestra.workflow.TaskStateManager;
 import com.orchestra.workflow.Workflow;
 
 public class WorkflowScheduler {
@@ -33,6 +33,7 @@ public class WorkflowScheduler {
     private final RetryScheduler retryScheduler;
     private final AtomicInteger pendingRetries = new AtomicInteger(0);
     private final Object retryMonitor = new Object();
+    private final TaskStateManager stateManager;
 
     public WorkflowScheduler(
             DagValidator dagValidator,
@@ -45,7 +46,8 @@ public class WorkflowScheduler {
                 executionPool,
                 new RetryPolicy(100),
                 new RetryScheduler(
-                        Executors.newScheduledThreadPool(1)));
+                        Executors.newScheduledThreadPool(1)),
+                new TaskStateManager());
     }
 
     public WorkflowScheduler(
@@ -54,11 +56,30 @@ public class WorkflowScheduler {
             TaskExecutionPool executionPool,
             RetryPolicy retryPolicy,
             RetryScheduler retryScheduler) {
+
+        this(
+                dagValidator,
+                taskExecutor,
+                executionPool,
+                retryPolicy,
+                retryScheduler,
+                new TaskStateManager());
+    }
+
+    public WorkflowScheduler(
+            DagValidator dagValidator,
+            TaskExecutor taskExecutor,
+            TaskExecutionPool executionPool,
+            RetryPolicy retryPolicy,
+            RetryScheduler retryScheduler,
+            TaskStateManager stateManager) {
+
         this.dagValidator = dagValidator;
         this.taskExecutor = taskExecutor;
         this.executionPool = executionPool;
         this.retryPolicy = retryPolicy;
         this.retryScheduler = retryScheduler;
+        this.stateManager = stateManager;
     }
 
     public void execute(Workflow workflow) {
@@ -183,8 +204,7 @@ public class WorkflowScheduler {
                 task.setRetryCount(
                         task.getRetryCount() + 1);
 
-                task.setStatus(
-                        TaskStatus.PENDING);
+                stateManager.markPending(task);
 
                 pendingRetries.incrementAndGet();
 
@@ -253,8 +273,8 @@ public class WorkflowScheduler {
 
             blockedTasks.add(dependentId);
 
-            tasks.get(dependentId)
-                    .setStatus(TaskStatus.BLOCKED);
+            stateManager.markBlocked(
+                    tasks.get(dependentId));
 
             handleFailure(
                     dependentId,
@@ -316,16 +336,4 @@ public class WorkflowScheduler {
         return readyQueue;
     }
 
-    private void executeTask(Task task) {
-
-        task.setStatus(TaskStatus.RUNNING);
-
-        System.out.println(
-                "Executing task: " + task.getId());
-
-        task.setStatus(TaskStatus.SUCCESS);
-
-        System.out.println(
-                "Task completed: " + task.getId());
-    }
 }

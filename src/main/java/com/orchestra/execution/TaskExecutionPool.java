@@ -8,7 +8,8 @@ import java.util.concurrent.Future;
 
 import com.orchestra.workflow.Task;
 
-public class TaskExecutionPool {
+public class TaskExecutionPool
+        implements TaskExecutionService {
 
     private final ExecutorService executorService;
 

@@ -17,6 +17,7 @@ import com.orchestra.execution.RetryScheduler;
 import com.orchestra.execution.TaskExecution;
 import com.orchestra.execution.TaskExecutionPool;
 import com.orchestra.execution.TaskExecutionResult;
+import com.orchestra.execution.TaskExecutionService;
 import com.orchestra.execution.TaskExecutor;
 import com.orchestra.workflow.DagValidator;
 import com.orchestra.workflow.RetryPolicy;
@@ -28,7 +29,7 @@ public class WorkflowScheduler {
 
     private final DagValidator dagValidator;
     private final TaskExecutor taskExecutor;
-    private final TaskExecutionPool executionPool;
+    private final TaskExecutionService executionService;
     private final RetryPolicy retryPolicy;
     private final RetryScheduler retryScheduler;
     private final AtomicInteger pendingRetries = new AtomicInteger(0);
@@ -38,12 +39,12 @@ public class WorkflowScheduler {
     public WorkflowScheduler(
             DagValidator dagValidator,
             TaskExecutor taskExecutor,
-            TaskExecutionPool executionPool) {
+            TaskExecutionService executionService) {
 
         this(
                 dagValidator,
                 taskExecutor,
-                executionPool,
+                executionService,
                 new RetryPolicy(100),
                 new RetryScheduler(
                         Executors.newScheduledThreadPool(1)),
@@ -69,14 +70,14 @@ public class WorkflowScheduler {
     public WorkflowScheduler(
             DagValidator dagValidator,
             TaskExecutor taskExecutor,
-            TaskExecutionPool executionPool,
+            TaskExecutionService executionService,
             RetryPolicy retryPolicy,
             RetryScheduler retryScheduler,
             TaskStateManager stateManager) {
 
         this.dagValidator = dagValidator;
         this.taskExecutor = taskExecutor;
-        this.executionPool = executionPool;
+        this.executionService = executionService;
         this.retryPolicy = retryPolicy;
         this.retryScheduler = retryScheduler;
         this.stateManager = stateManager;
@@ -109,7 +110,7 @@ public class WorkflowScheduler {
 
                 Task task = tasks.get(taskId);
 
-                executionPool.submit(
+                executionService.submit(
                         task,
                         taskExecutor);
 
@@ -120,7 +121,7 @@ public class WorkflowScheduler {
 
                 try {
 
-                    Future<TaskExecution> completed = executionPool.takeCompleted();
+                    Future<TaskExecution> completed = executionService.takeCompleted();
 
                     TaskExecution execution = completed.get();
 

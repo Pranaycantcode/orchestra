@@ -46,10 +46,10 @@ class TaskExecutionPoolTest {
                         return TaskExecutionResult.SUCCESS;
                 };
 
-                TaskExecutionPool pool = new TaskExecutionPool(2);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
-                pool.submit(taskA, executor);
-                pool.submit(taskB, executor);
+                pool.submit(taskA);
+                pool.submit(taskB);
 
                 Future<TaskExecution> first = pool.takeCompleted();
 
@@ -98,11 +98,11 @@ class TaskExecutionPoolTest {
                         throw new RuntimeException("Something went wrong");
                 };
 
-                TaskExecutionPool pool = new TaskExecutionPool(1);
+                TaskExecutionPool pool = new TaskExecutionPool(1, executor);
 
                 try {
 
-                        pool.submit(task, executor);
+                        pool.submit(task);
 
                         Future<TaskExecution> future = pool.takeCompleted();
 

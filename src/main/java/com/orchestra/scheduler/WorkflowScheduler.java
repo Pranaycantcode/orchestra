@@ -110,9 +110,7 @@ public class WorkflowScheduler {
 
                 Task task = tasks.get(taskId);
 
-                executionService.submit(
-                        task,
-                        taskExecutor);
+                executionService.submit(task);
 
                 runningTasks++;
             }

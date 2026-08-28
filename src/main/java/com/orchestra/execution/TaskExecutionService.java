@@ -6,10 +6,8 @@ import com.orchestra.workflow.Task;
 
 public interface TaskExecutionService {
 
-    void submit(
-            Task task,
-            TaskExecutor taskExecutor);
+        void submit(Task task);
 
-    Future<TaskExecution> takeCompleted()
-            throws InterruptedException;
+        Future<TaskExecution> takeCompleted()
+                        throws InterruptedException;
 }

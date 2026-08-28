@@ -15,17 +15,23 @@ public class TaskExecutionPool
 
     private final CompletionService<TaskExecution> completionService;
 
-    public TaskExecutionPool(int threadCount) {
+    private final TaskExecutor taskExecutor;
+
+    public TaskExecutionPool(
+            int threadCount,
+            TaskExecutor taskExecutor) {
 
         this.executorService = Executors.newFixedThreadPool(threadCount);
 
         this.completionService = new ExecutorCompletionService<>(
                 executorService);
+
+        this.taskExecutor = taskExecutor;
     }
 
-    public void submit(
-            Task task,
-            TaskExecutor taskExecutor) {
+
+    @Override
+    public void submit(Task task) {
 
         completionService.submit(
                 () -> {

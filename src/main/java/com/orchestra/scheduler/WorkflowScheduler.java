@@ -18,7 +18,6 @@ import com.orchestra.execution.TaskExecution;
 import com.orchestra.execution.TaskExecutionPool;
 import com.orchestra.execution.TaskExecutionResult;
 import com.orchestra.execution.TaskExecutionService;
-import com.orchestra.execution.TaskExecutor;
 import com.orchestra.workflow.DagValidator;
 import com.orchestra.workflow.RetryPolicy;
 import com.orchestra.workflow.Task;
@@ -28,7 +27,6 @@ import com.orchestra.workflow.Workflow;
 public class WorkflowScheduler {
 
     private final DagValidator dagValidator;
-    private final TaskExecutor taskExecutor;
     private final TaskExecutionService executionService;
     private final RetryPolicy retryPolicy;
     private final RetryScheduler retryScheduler;
@@ -38,12 +36,10 @@ public class WorkflowScheduler {
 
     public WorkflowScheduler(
             DagValidator dagValidator,
-            TaskExecutor taskExecutor,
             TaskExecutionService executionService) {
 
         this(
                 dagValidator,
-                taskExecutor,
                 executionService,
                 new RetryPolicy(100),
                 new RetryScheduler(
@@ -53,14 +49,12 @@ public class WorkflowScheduler {
 
     public WorkflowScheduler(
             DagValidator dagValidator,
-            TaskExecutor taskExecutor,
             TaskExecutionPool executionPool,
             RetryPolicy retryPolicy,
             RetryScheduler retryScheduler) {
 
         this(
                 dagValidator,
-                taskExecutor,
                 executionPool,
                 retryPolicy,
                 retryScheduler,
@@ -69,14 +63,12 @@ public class WorkflowScheduler {
 
     public WorkflowScheduler(
             DagValidator dagValidator,
-            TaskExecutor taskExecutor,
             TaskExecutionService executionService,
             RetryPolicy retryPolicy,
             RetryScheduler retryScheduler,
             TaskStateManager stateManager) {
 
         this.dagValidator = dagValidator;
-        this.taskExecutor = taskExecutor;
         this.executionService = executionService;
         this.retryPolicy = retryPolicy;
         this.retryScheduler = retryScheduler;

@@ -196,7 +196,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 scheduler.execute(workflow);
@@ -255,7 +254,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 scheduler.execute(workflow);
@@ -312,7 +310,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 scheduler.execute(workflow);
@@ -357,7 +354,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 assertThrows(
@@ -405,7 +401,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 scheduler.execute(workflow);
@@ -472,7 +467,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 scheduler.execute(workflow);
@@ -550,7 +544,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 scheduler.execute(workflow);
@@ -629,7 +622,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 scheduler.execute(workflow);
@@ -689,7 +681,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 scheduler.execute(workflow);
@@ -779,7 +770,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 ExecutorService schedulerThread = Executors.newSingleThreadExecutor();
@@ -871,7 +861,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 try {
@@ -934,7 +923,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool);
 
                 try {
@@ -1012,7 +1000,6 @@ class WorkflowSchedulerTest {
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
-                                executor,
                                 pool,
                                 retryPolicy,
                                 retryScheduler);

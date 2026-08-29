@@ -29,26 +29,35 @@ public class TaskExecutionPool
         this.taskExecutor = taskExecutor;
     }
 
-
     @Override
     public void submit(Task task) {
 
         completionService.submit(
                 () -> {
 
+                    long startedAt = System.currentTimeMillis();
+
                     try {
 
                         TaskExecutionResult result = taskExecutor.execute(task);
 
+                        long completedAt = System.currentTimeMillis();
+
                         return new TaskExecution(
                                 task.getId(),
-                                result);
+                                result,
+                                startedAt,
+                                completedAt);
 
                     } catch (Exception e) {
 
+                        long completedAt = System.currentTimeMillis();
+
                         return new TaskExecution(
                                 task.getId(),
-                                TaskExecutionResult.FAILED);
+                                TaskExecutionResult.FAILED,
+                                startedAt,
+                                completedAt);
                     }
                 });
     }

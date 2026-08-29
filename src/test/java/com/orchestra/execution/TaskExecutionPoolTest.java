@@ -4,6 +4,7 @@ import java.util.Set;
 import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import com.orchestra.workflow.Task;
@@ -81,6 +82,10 @@ class TaskExecutionPoolTest {
                                 TaskStatus.SUCCESS,
                                 taskB.getStatus());
 
+                assertTrue(firstExecution.startedAt() > 0);
+                assertTrue(firstExecution.completedAt() >= firstExecution.startedAt());
+                assertTrue(firstExecution.durationMillis() >= 0);
+
                 pool.shutdown();
         }
 
@@ -115,6 +120,8 @@ class TaskExecutionPoolTest {
                         assertEquals(
                                         TaskExecutionResult.FAILED,
                                         execution.result());
+
+                                        
 
                 } finally {
 

@@ -16,8 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.orchestra.execution.RetryScheduler;
 import com.orchestra.execution.TaskExecution;
 import com.orchestra.execution.TaskExecutionPool;
+import com.orchestra.execution.TaskExecutionRequest;
 import com.orchestra.execution.TaskExecutionResult;
-import com.orchestra.execution.TaskExecutionService;
 import com.orchestra.workflow.DagValidator;
 import com.orchestra.workflow.RetryPolicy;
 import com.orchestra.workflow.Task;
@@ -27,7 +27,7 @@ import com.orchestra.workflow.Workflow;
 public class WorkflowScheduler {
 
     private final DagValidator dagValidator;
-    private final TaskExecutionService executionService;
+    private final TaskExecutionPool executionPool;
     private final RetryPolicy retryPolicy;
     private final RetryScheduler retryScheduler;
     private final AtomicInteger pendingRetries = new AtomicInteger(0);
@@ -36,11 +36,11 @@ public class WorkflowScheduler {
 
     public WorkflowScheduler(
             DagValidator dagValidator,
-            TaskExecutionService executionService) {
+            TaskExecutionPool executionPool) {
 
         this(
                 dagValidator,
-                executionService,
+                executionPool,
                 new RetryPolicy(100),
                 new RetryScheduler(
                         Executors.newScheduledThreadPool(1)),
@@ -63,13 +63,13 @@ public class WorkflowScheduler {
 
     public WorkflowScheduler(
             DagValidator dagValidator,
-            TaskExecutionService executionService,
+            TaskExecutionPool executionPool,
             RetryPolicy retryPolicy,
             RetryScheduler retryScheduler,
             TaskStateManager stateManager) {
 
         this.dagValidator = dagValidator;
-        this.executionService = executionService;
+        this.executionPool = executionPool;
         this.retryPolicy = retryPolicy;
         this.retryScheduler = retryScheduler;
         this.stateManager = stateManager;
@@ -85,8 +85,7 @@ public class WorkflowScheduler {
 
         Map<String, List<String>> dependents = buildDependentsMap(tasks);
 
-        Queue<String> readyQueue = initializeReadyQueue(
-                remainingDependencies);
+        Queue<String> readyQueue = initializeReadyQueue(remainingDependencies);
 
         Set<String> blockedTasks = new HashSet<>();
 
@@ -102,7 +101,13 @@ public class WorkflowScheduler {
 
                 Task task = tasks.get(taskId);
 
-                executionService.submit(task);
+                stateManager.markRunning(task);
+
+                executionPool.submit(
+                        new TaskExecutionRequest(
+                                task.getId(),
+                                task.getCommand(),
+                                task.getRetryCount()));
 
                 runningTasks++;
             }
@@ -111,7 +116,7 @@ public class WorkflowScheduler {
 
                 try {
 
-                    Future<TaskExecution> completed = executionService.takeCompleted();
+                    Future<TaskExecution> completed = executionPool.takeCompleted();
 
                     TaskExecution execution = completed.get();
 
@@ -177,7 +182,11 @@ public class WorkflowScheduler {
 
         TaskExecutionResult result = execution.result();
 
+        Task task = tasks.get(taskId);
+
         if (result == TaskExecutionResult.SUCCESS) {
+
+            stateManager.markSuccess(task);
 
             handleSuccess(
                     taskId,
@@ -188,7 +197,7 @@ public class WorkflowScheduler {
 
         } else {
 
-            Task task = tasks.get(taskId);
+            stateManager.markFailed(task);
 
             if (task.canRetry()) {
 
@@ -296,7 +305,9 @@ public class WorkflowScheduler {
         Map<String, List<String>> dependents = new HashMap<>();
 
         for (String taskId : tasks.keySet()) {
-            dependents.put(taskId, new ArrayList<>());
+            dependents.put(
+                    taskId,
+                    new ArrayList<>());
         }
 
         for (Task task : tasks.values()) {
@@ -326,5 +337,4 @@ public class WorkflowScheduler {
 
         return readyQueue;
     }
-
 }

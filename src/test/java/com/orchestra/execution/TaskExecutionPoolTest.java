@@ -49,8 +49,17 @@ class TaskExecutionPoolTest {
 
                 TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
-                pool.submit(taskA);
-                pool.submit(taskB);
+                pool.submit(
+                                new TaskExecutionRequest(
+                                                taskA.getId(),
+                                                taskA.getCommand(),
+                                                taskA.getRetryCount()));
+
+                pool.submit(
+                                new TaskExecutionRequest(
+                                                taskB.getId(),
+                                                taskB.getCommand(),
+                                                taskB.getRetryCount()));
 
                 Future<TaskExecution> first = pool.takeCompleted();
 
@@ -74,13 +83,6 @@ class TaskExecutionPoolTest {
                                                 firstExecution.taskId(),
                                                 secondExecution.taskId()));
 
-                assertEquals(
-                                TaskStatus.SUCCESS,
-                                taskA.getStatus());
-
-                assertEquals(
-                                TaskStatus.SUCCESS,
-                                taskB.getStatus());
 
                 assertTrue(firstExecution.startedAt() > 0);
                 assertTrue(firstExecution.completedAt() >= firstExecution.startedAt());
@@ -107,7 +109,11 @@ class TaskExecutionPoolTest {
 
                 try {
 
-                        pool.submit(task);
+                        pool.submit(
+                                        new TaskExecutionRequest(
+                                                        task.getId(),
+                                                        task.getCommand(),
+                                                        task.getRetryCount()));
 
                         Future<TaskExecution> future = pool.takeCompleted();
 
@@ -120,8 +126,6 @@ class TaskExecutionPoolTest {
                         assertEquals(
                                         TaskExecutionResult.FAILED,
                                         execution.result());
-
-                                        
 
                 } finally {
 

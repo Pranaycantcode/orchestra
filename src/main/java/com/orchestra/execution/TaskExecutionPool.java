@@ -1,5 +1,6 @@
 package com.orchestra.execution;
 
+import java.util.Set;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
@@ -30,7 +31,7 @@ public class TaskExecutionPool
     }
 
     @Override
-    public void submit(Task task) {
+    public void submit(TaskExecutionRequest request) {
 
         completionService.submit(
                 () -> {
@@ -38,6 +39,14 @@ public class TaskExecutionPool
                     long startedAt = System.currentTimeMillis();
 
                     try {
+
+                        Task task = new Task(
+                                request.taskId(),
+                                request.taskId(),
+                                request.command(),
+                                Set.of());
+
+                        task.setRetryCount(request.retryCount());
 
                         TaskExecutionResult result = taskExecutor.execute(task);
 
@@ -54,7 +63,7 @@ public class TaskExecutionPool
                         long completedAt = System.currentTimeMillis();
 
                         return new TaskExecution(
-                                task.getId(),
+                                request.taskId(),
                                 TaskExecutionResult.FAILED,
                                 startedAt,
                                 completedAt);

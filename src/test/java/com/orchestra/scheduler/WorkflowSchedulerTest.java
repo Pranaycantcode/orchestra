@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
+import com.orchestra.execution.ProcessTaskExecutor;
 import com.orchestra.execution.RetryScheduler;
 import com.orchestra.execution.TaskExecutionPool;
 import com.orchestra.execution.TaskExecutionResult;
@@ -191,8 +192,7 @@ class WorkflowSchedulerTest {
 
                 RecordingTaskExecutor executor = new RecordingTaskExecutor();
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -249,8 +249,7 @@ class WorkflowSchedulerTest {
 
                 RecordingTaskExecutor executor = new RecordingTaskExecutor();
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -305,8 +304,7 @@ class WorkflowSchedulerTest {
 
                 RecordingTaskExecutor executor = new RecordingTaskExecutor();
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -349,8 +347,7 @@ class WorkflowSchedulerTest {
 
                 RecordingTaskExecutor executor = new RecordingTaskExecutor();
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -396,8 +393,7 @@ class WorkflowSchedulerTest {
 
                 ControlledTaskExecutor executor = new ControlledTaskExecutor(Set.of("B"));
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -462,8 +458,7 @@ class WorkflowSchedulerTest {
 
                 ControlledTaskExecutor executor = new ControlledTaskExecutor(Set.of("B"));
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -539,8 +534,7 @@ class WorkflowSchedulerTest {
 
                 ControlledTaskExecutor executor = new ControlledTaskExecutor(Set.of("B"));
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -617,8 +611,7 @@ class WorkflowSchedulerTest {
                         return TaskExecutionResult.SUCCESS;
                 };
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -676,8 +669,7 @@ class WorkflowSchedulerTest {
 
                 ConcurrentRecordingExecutor executor = new ConcurrentRecordingExecutor();
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -765,8 +757,7 @@ class WorkflowSchedulerTest {
 
                 BlockingExecutor executor = new BlockingExecutor();
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(2, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(2, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -856,8 +847,7 @@ class WorkflowSchedulerTest {
                         return TaskExecutionResult.SUCCESS;
                 };
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(1, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(1, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -918,8 +908,7 @@ class WorkflowSchedulerTest {
                         return TaskExecutionResult.FAILED;
                 };
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(1, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(1, executor);
 
                 WorkflowScheduler scheduler = new WorkflowScheduler(
                                 new DagValidator(),
@@ -988,8 +977,7 @@ class WorkflowSchedulerTest {
                         return TaskExecutionResult.SUCCESS;
                 };
 
-                TaskExecutionPool pool =
-        new TaskExecutionPool(1, executor);
+                TaskExecutionPool pool = new TaskExecutionPool(1, executor);
 
                 RetryPolicy retryPolicy = new RetryPolicy(100);
 
@@ -1028,6 +1016,53 @@ class WorkflowSchedulerTest {
 
                         pool.shutdown();
                         retryScheduler.shutdown();
+                }
+        }
+
+        @Test
+        void shouldExecuteWorkflowUsingRealProcessExecutor()
+                        throws Exception {
+
+                Task taskA = new Task(
+                                "A",
+                                "Task A",
+                                "echo Task A",
+                                Set.of());
+
+                Task taskB = new Task(
+                                "B",
+                                "Task B",
+                                "echo Task B",
+                                Set.of("A"));
+
+                Workflow workflow = new Workflow(
+                                "real-process-workflow",
+                                "Real process workflow",
+                                Map.of(
+                                                "A", taskA,
+                                                "B", taskB));
+
+                TaskExecutionPool pool = new TaskExecutionPool(
+                                2,
+                                new ProcessTaskExecutor());
+
+                WorkflowScheduler scheduler = new WorkflowScheduler(
+                                new DagValidator(),
+                                pool);
+
+                try {
+                        scheduler.execute(workflow);
+
+                        assertEquals(
+                                        TaskStatus.SUCCESS,
+                                        taskA.getStatus());
+
+                        assertEquals(
+                                        TaskStatus.SUCCESS,
+                                        taskB.getStatus());
+
+                } finally {
+                        pool.shutdown();
                 }
         }
 

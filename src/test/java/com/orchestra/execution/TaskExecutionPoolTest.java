@@ -83,7 +83,6 @@ class TaskExecutionPoolTest {
                                                 firstExecution.taskId(),
                                                 secondExecution.taskId()));
 
-
                 assertTrue(firstExecution.startedAt() > 0);
                 assertTrue(firstExecution.completedAt() >= firstExecution.startedAt());
                 assertTrue(firstExecution.durationMillis() >= 0);
@@ -129,6 +128,138 @@ class TaskExecutionPoolTest {
 
                 } finally {
 
+                        pool.shutdown();
+                }
+        }
+
+        @Test
+        void shouldExecuteRealCommandsThroughProcessExecutor()
+                        throws Exception {
+
+                TaskExecutionPool pool = new TaskExecutionPool(
+                                2,
+                                new ProcessTaskExecutor());
+
+                try {
+                        pool.submit(
+                                        new TaskExecutionRequest(
+                                                        "A",
+                                                        "echo Orchestra",
+                                                        0));
+
+                        Future<TaskExecution> future = pool.takeCompleted();
+
+                        TaskExecution execution = future.get();
+
+                        assertEquals(
+                                        "A",
+                                        execution.taskId());
+
+                        assertEquals(
+                                        TaskExecutionResult.SUCCESS,
+                                        execution.result());
+
+                        assertTrue(
+                                        execution.completedAt() >= execution.startedAt());
+
+                } finally {
+                        pool.shutdown();
+                }
+        }
+
+        @Test
+        void shouldReportRealCommandFailureThroughProcessExecutor()
+                        throws Exception {
+
+                TaskExecutionPool pool = new TaskExecutionPool(
+                                1,
+                                new ProcessTaskExecutor());
+
+                try {
+                        pool.submit(
+                                        new TaskExecutionRequest(
+                                                        "A",
+                                                        "exit 1",
+                                                        0));
+
+                        Future<TaskExecution> future = pool.takeCompleted();
+
+                        TaskExecution execution = future.get();
+
+                        assertEquals(
+                                        "A",
+                                        execution.taskId());
+
+                        assertEquals(
+                                        TaskExecutionResult.FAILED,
+                                        execution.result());
+
+                        assertTrue(
+                                        execution.completedAt() >= execution.startedAt());
+
+                } finally {
+                        pool.shutdown();
+                }
+        }
+
+        @Test
+        void shouldExecuteMultipleRealCommandsConcurrently()
+                        throws Exception {
+
+                TaskExecutionPool pool = new TaskExecutionPool(
+                                2,
+                                new ProcessTaskExecutor());
+
+                try {
+                        long start = System.currentTimeMillis();
+
+                        pool.submit(
+                                        new TaskExecutionRequest(
+                                                        "A",
+                                                        "ping 127.0.0.1 -n 2 > nul",
+                                                        0));
+
+                        pool.submit(
+                                        new TaskExecutionRequest(
+                                                        "B",
+                                                        "ping 127.0.0.1 -n 2 > nul",
+                                                        0));
+
+                        Future<TaskExecution> first = pool.takeCompleted();
+
+                        Future<TaskExecution> second = pool.takeCompleted();
+
+                        TaskExecution executionA = first.get();
+                        TaskExecution executionB = second.get();
+
+                        long elapsed = System.currentTimeMillis() - start;
+
+                        assertEquals(
+                                        TaskExecutionResult.SUCCESS,
+                                        executionA.result());
+
+                        assertEquals(
+                                        TaskExecutionResult.SUCCESS,
+                                        executionB.result());
+
+                        assertEquals(
+                                        2,
+                                        java.util.Set.of(
+                                                        executionA.taskId(),
+                                                        executionB.taskId()).size());
+
+                        assertTrue(
+                                        executionA.durationMillis() > 0);
+
+                        assertTrue(
+                                        executionB.durationMillis() > 0);
+
+                        assertTrue(
+                                        elapsed < 1800,
+                                        "Commands did not execute concurrently. Elapsed: "
+                                                        + elapsed + " ms");
+
+                } finally {
                         pool.shutdown();
                 }
         }
